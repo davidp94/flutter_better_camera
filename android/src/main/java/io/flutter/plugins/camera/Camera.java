@@ -39,6 +39,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.stream.Collectors;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -101,6 +102,8 @@ public class Camera {
 
   private boolean mAutoFocus;
   private int mFlash = Constants.FLASH_OFF;
+
+  private boolean supportRaw;
 
   private CameraCharacteristics mCameraCharacteristics;
   private int mWhiteBalance = Constants.WB_AUTO;
@@ -173,11 +176,18 @@ public class Camera {
             mCameraCharacteristics.get(CameraCharacteristics.LENS_FACING) == CameraMetadata.LENS_FACING_FRONT;
     ResolutionPreset preset = ResolutionPreset.valueOf(resolutionPreset);
 
+    int[] availCaps = mCameraCharacteristics.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES);
+    List<Integer> lst = Arrays.stream(availCaps).boxed().collect(Collectors.toList());
+    supportRaw = lst.contains(CameraMetadata.REQUEST_AVAILABLE_CAPABILITIES_RAW);
+    Log.d("DAVID-DEBUG-supportRaw", Boolean.toString(supportRaw));
 
     recordingProfile =
         CameraUtils.getBestAvailableCamcorderProfileForResolutionPreset(cameraName, preset);
-    captureSize = new Size(recordingProfile.videoFrameWidth, recordingProfile.videoFrameHeight);
-    previewSize = computeBestPreviewSize(cameraName, preset);
+    recordingProfile.videoFrameHeight = 1200;
+    recordingProfile.videoFrameWidth = 19200;
+    
+    captureSize = new Size(19200, 12000);
+    previewSize = new Size(19200, 12000); // (cameraName, preset);
   }
 
   private void setBestAERange(CameraCharacteristics characteristics) {
@@ -232,9 +242,38 @@ public class Camera {
     if (pictureImageReader != null) {
       pictureImageReader.close();
     }
-    pictureImageReader =
-            ImageReader.newInstance(
-                    captureSize.getWidth(), captureSize.getHeight(), ImageFormat.JPEG, 2);
+    Log.d(TAG, "captureSize ");
+    Log.d(TAG, captureSize.toString());
+    // Log.d(TAG, "captureSize ");
+
+    // pictureImageReader =
+    //         ImageReader.newInstance(
+    //                 captureSize.getWidth(), captureSize.getHeight(), ImageFormat.JPEG, 2);
+
+    // Note: https://developer.android.com/reference/android/media/Image#getFormat()
+
+    // https://stackoverflow.com/a/42147459
+    // The only guaranteed formats that all camera devices must support are YUV_420_888 and JPEG;
+    // even at that, LEGACY-level devices generally only support JPEG at maximum resolution
+    // (and YUV_420_888 at preview resolutions, not generally higher than 1080p).
+
+    if(supportRaw) {
+      Log.e(TAG, "Support Raw");
+      pictureImageReader = ImageReader.newInstance(
+        5760, 3600, ImageFormat.RAW_SENSOR, 2
+      );
+    } else {
+      Log.e(TAG, "Does not support Raw");
+      pictureImageReader = ImageReader.newInstance(
+        5760, 3600, ImageFormat.JPEG, 2
+      );
+    }
+
+
+    Log.e(TAG, "[DAVID-DEBUG] pictureImageReader");
+    Log.e(TAG, Integer.toString(pictureImageReader.getWidth()));
+    Log.e(TAG, Integer.toString(pictureImageReader.getHeight()));
+
 
   }
 
@@ -243,9 +282,14 @@ public class Camera {
       imageStreamReader.close();
     }
 
+    // imageStreamReader =
+    //         ImageReader.newInstance(
+    //                 previewSize.getWidth(), previewSize.getHeight(), ImageFormat.YUV_420_888, 2);
+
+
     imageStreamReader =
-            ImageReader.newInstance(
-                    previewSize.getWidth(), previewSize.getHeight(), ImageFormat.YUV_420_888, 2);
+    ImageReader.newInstance(
+            5760, 3600, ImageFormat.YUV_420_888, 2);
 
   }
 
@@ -496,18 +540,21 @@ public class Camera {
   public void takePicture(String filePath, @NonNull final Result result){
     mCaptureCallback.setFilePath(filePath);
     mCaptureCallback.setResult(result);
+    // mCaptureCallback.getOutputConfigurations()
     Log.e(TAG, "takePicture");
 
-    if (mAutoFocus) {
-      Log.e(TAG, "takePicture-mAutoFocus");
-      lockFocus();
-    } else {
+    // if (mAutoFocus) {
+    //   Log.e(TAG, "takePicture-mAutoFocus");
+    //   lockFocus();
+    // } else {
       Log.e(TAG, "takePicture-noAutoFocus");
       captureStillPicture(filePath,result);
-    }
+    // }
   }
   public void captureStillPicture(String filePath, @NonNull final Result result) {
     final File file = new File(filePath);
+
+    Log.e(TAG, "[DAVID-DEBUG] captureStillPicture");
 
 
     if (file.exists()) {
@@ -519,6 +566,9 @@ public class Camera {
     pictureImageReader.setOnImageAvailableListener(
         reader -> {
           try (Image image = reader.acquireLatestImage()) {
+            Log.d("DAVID-acquireLatestImage", Integer.toString(image.getWidth()));
+            Log.d("DAVID-acquireLatestImage", Integer.toString(image.getHeight()));
+            
             ByteBuffer buffer = image.getPlanes()[0].getBuffer();
             writeToFile(buffer, file);
             result.success(null);

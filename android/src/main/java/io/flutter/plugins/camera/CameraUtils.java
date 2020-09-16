@@ -9,6 +9,7 @@ import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CameraMetadata;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.CamcorderProfile;
+import android.util.Log;
 import android.util.Size;
 import io.flutter.plugins.camera.Camera.ResolutionPreset;
 import java.util.ArrayList;
@@ -25,13 +26,20 @@ public final class CameraUtils {
   private CameraUtils() {}
 
   static Size computeBestPreviewSize(String cameraName, ResolutionPreset preset) {
-    if (preset.ordinal() > ResolutionPreset.high.ordinal()) {
-      preset = ResolutionPreset.high;
-    }
+    // if (preset.ordinal() > ResolutionPreset.high.ordinal()) {
+    //   preset = ResolutionPreset.high;
+    // }
 
     CamcorderProfile profile =
         getBestAvailableCamcorderProfileForResolutionPreset(cameraName, preset);
-    return new Size(profile.videoFrameWidth, profile.videoFrameHeight);
+        profile.videoFrameHeight = 12000;
+        profile.videoFrameWidth = 19000;
+        Log.d("[DAVID:DEBUG]", "profile");
+        Log.d("[DAVID:DEBUG]", Integer.toString(profile.videoBitRate));
+        Log.d("[DAVID:DEBUG]", Integer.toString(profile.videoFrameHeight));
+        Log.d("[DAVID:DEBUG]", Integer.toString(profile.videoFrameWidth));
+        // return new Size(profile.videoFrameWidth, profile.videoFrameHeight);
+    return new Size(19200, 10800);
   }
 
   static Size computeBestCaptureSize(StreamConfigurationMap streamConfigurationMap) {
